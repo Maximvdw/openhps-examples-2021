@@ -1,0 +1,21 @@
+{
+  "name": "openhps-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node ./src/bin/server.ts"
+  },
+  "author": "Maxim Van de Wynckel",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@openhps/core": "^0.3.9",
+    "@openhps/rf": "^0.1.3",
+    "@openhps/socket": "^0.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.12",
+    "ts-node": "^10.4.0",
+    "typescript": "^4.5.3"
+  }
+}
