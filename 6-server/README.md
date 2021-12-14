@@ -1,4 +1,4 @@
-## OpenHPS: Server Example (4)
+## OpenHPS: Server Example (6)
 This is a simple example of how to set up a server that uses OpenHPS. The example creates an additional endpoint for storing data and also
 uses clustering to offer multiple services listening on the same port.
 
@@ -7,6 +7,8 @@ uses clustering to offer multiple services listening on the same port.
 - Set up a data service that stores `BLEObject`s in memory
 - Set up a socket connection on port 3000
 - Set up a multilateration positioning algorithm
+- Set up a knn fingerprinting algorithm
+- Load a dataset
 
 ### What will you not learn?
 - Authorization of the socket server (any client can access it)

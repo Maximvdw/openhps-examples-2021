@@ -1,6 +1,6 @@
-import { Absolute2DPosition, DataFrame, DataObject, LengthUnit, Model, ModelBuilder } from '@openhps/core';
+import { DataFrame, DataObject, Model, ModelBuilder } from '@openhps/core';
 import { SocketClient, SocketClientSink } from '@openhps/socket';
-import { RelativeRSSI } from '@openhps/rf';
+import { RelativeRSSI, BLEObject } from '@openhps/rf';
 
 console.log("Creating the positioning model ...");
 
@@ -21,10 +21,14 @@ ModelBuilder.create()
     .build().then((model: Model) => {
         console.log("Client positioning model created ...");
 
-        const dataFrame = new DataFrame();
-        dataFrame.source = new DataObject("mvdewync", "Maxim Van de Wynckel");
-        // Example has two relative beacons with same RSSI (so the position should be in the middle if the calibration data is the same)
-        dataFrame.source.addRelativePosition(new RelativeRSSI("5DC48FBFB912", -50));
-        dataFrame.source.addRelativePosition(new RelativeRSSI("3E182D702D4C", -50));
-        model.push(dataFrame);
+        setTimeout(() => {
+            const dataFrame = new DataFrame();
+            dataFrame.source = new DataObject("mvdewync", "Maxim Van de Wynckel");
+            // Example has two relative beacons with same RSSI (so the position should be in the middle if the calibration data is the same)
+            dataFrame.source.addRelativePosition(new RelativeRSSI(new BLEObject("5DC48FBFB912"), -50));
+            dataFrame.source.addRelativePosition(new RelativeRSSI(new BLEObject("3E182D702D4C"), -50));
+            
+            console.log("Sending data frame ...");
+            model.push(dataFrame);
+        }, 500);
     }).catch(console.error);
