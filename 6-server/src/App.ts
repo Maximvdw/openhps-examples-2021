@@ -5,6 +5,7 @@
 import { Absolute3DPosition, CallbackNode, CallbackSinkNode, DataFrame, DataObjectService, GraphBuilder, LengthUnit, MemoryDataService, Model, ModelBuilder, MultilaterationNode } from '@openhps/core';
 import { SocketServer, SocketServerSource } from '@openhps/socket';
 import { BLEObject, PropagationModel, RelativeRSSIProcessing } from '@openhps/rf';
+import { DistanceFunction, Fingerprint, FingerprintService, KNNFingerprintingNode, WeightFunction } from '@openhps/fingerprinting';
 import * as http from 'http';
 
 export class App {
@@ -46,6 +47,12 @@ export class App {
             // A data service for storing data objects of the type BLEObject. We store the objects
             // in memory for this example
             .addService(new DataObjectService(new MemoryDataService(BLEObject)))
+            // A data service for storing and processing fingerprints. We store the objects
+            // in memory for this example
+            .addService(new FingerprintService(new MemoryDataService(Fingerprint), {
+                classifier: 'wlan',             // Classifier is needed when you want multiple fingerprint stores
+                autoUpdate: false,              // Automatically process the fingerprints when one is added (not recommended)
+            }))
             // Graph shapes are a good way to structure your process network
             // In this case we create a shape for our 'online' endpoint
             .addShape(GraphBuilder.create()
@@ -79,6 +86,12 @@ export class App {
                     minReferences: 1,               // Minimum amount of beacons that need to be in range
                     maxReferences: 9,               // Maximum amount of beacons to use in the calculation
                     maxIterations: 1000,            // Maximum iterations for the nonlinear-least squares algorithm
+                }))
+                .via(new KNNFingerprintingNode({
+                    classifier: 'wlan',             // Classifier links this knn fingerprint node to the correct data service
+                    k: 3,                           // K=3 (fixed)
+                    similarityFunction: DistanceFunction.EUCLIDEAN,
+                    weightFunction: WeightFunction.SQUARE
                 }))
                 // A callback node is an easy node for prototyping and debugging, it allows you to define
                 // a function.
@@ -140,6 +153,12 @@ export class App {
 
             // Push the data frame to the calibration part of the model
             this.model.findNodeByName("server-calibration").push(dataFrame);
+        });
+    }
+
+    protected loadFingerprints(): Promise<void> {
+        return new Promise((resolve, reject) => {
+
         });
     }
 }
