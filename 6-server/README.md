@@ -12,6 +12,7 @@ uses clustering to offer multiple services listening on the same port.
 
 ### What will you not learn?
 - Authorization of the socket server (any client can access it)
+- High level fusion of two algorithms
 
 ### Installation
 1. Clone the repository

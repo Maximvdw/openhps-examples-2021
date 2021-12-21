@@ -59,11 +59,10 @@ export class App {
                 .from(new SocketServerSource({
                     uid: "online",                    // online socket endpoint
                 }))
-                .via(new CallbackNode((frame: DataFrame) => {
-                    // Simple logging that we received a data frame
-                    console.log("We received a data frame with source uid: " + frame.source.uid);
-                    console.log("Total relative positions for object: ", frame.source.getRelativePositions().length);
-                }))
+                // Fan out to two placeholders "multilateration" and "fingerprinting"
+                .to("multilateration", "fingerprinting"))
+            .addShape(GraphBuilder.create()
+                .from("multilateration")
                 // We assume that the data frames that we receive have a source object
                 // We also assume that this source object has relative positions to other objects (beacons) in RSSI
                 // First we have to convert this RSSI to a distance using a propagation formula
@@ -73,12 +72,9 @@ export class App {
                     propagationModel: PropagationModel.LOG_DISTANCE,
                     // Default 'gamma' environment variable if not set for the beacon
                     environmentFactor: 2.0,
-                    defaultCalibratedRSSI: -69
-                }))
-                .via(new CallbackNode((frame: DataFrame) => {
-                    // Simple logging that we processed a data frame
-                    // Normally we should see RelativeDistance here as well
-                    console.log("Total relative positions for object: ", frame.source.getRelativePositions().length);
+                    defaultCalibratedRSSI: -69,
+                    // Filter to only process multilateration with frame source UIDs that end with "_ble" in the name
+                    frameFilter: (frame) => frame.source.uid.endsWith("_ble")
                 }))
                 // Our relative positions that were previously only in RSSI are now in distance
                 // Use this to perform trilateration
@@ -97,7 +93,24 @@ export class App {
                 // a function.
                 .to(new CallbackSinkNode(frame => {
                     // Log the position in the console
-                    console.log("Calculated position: ", frame.source.getPosition().toVector3());
+                    console.log("Calculated position (multilateration): ", frame.source.getPosition().toVector3());
+                }))
+            )
+            .addShape(GraphBuilder.create()
+                .from("fingerprinting")
+                .via(new KNNFingerprintingNode({
+                    classifier: 'wlan',             // Classifier links this knn fingerprint node to the correct data service
+                    k: 3,                           // K=3 (fixed)
+                    similarityFunction: DistanceFunction.EUCLIDEAN,
+                    weightFunction: WeightFunction.SQUARE,
+                    // Filter to only process multilateration with frame source UIDs that end with "_wlan" in the name
+                    frameFilter: (frame) => frame.source.uid.endsWith("_wlan")
+                }))
+                // A callback node is an easy node for prototyping and debugging, it allows you to define
+                // a function.
+                .to(new CallbackSinkNode(frame => {
+                    // Log the position in the console
+                    console.log("Calculated position (fingerprinting): ", frame.source.getPosition().toVector3());
                 }))
             )
             // We create an additional shape for our 'calibration' endpoint
