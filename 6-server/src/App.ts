@@ -2,11 +2,13 @@
  * This file contains the server logic.
  */
 
-import { Absolute3DPosition, CallbackNode, CallbackSinkNode, DataFrame, DataObjectService, GraphBuilder, LengthUnit, MemoryDataService, Model, ModelBuilder, MultilaterationNode } from '@openhps/core';
+import { Absolute2DPosition, Absolute3DPosition, AngleUnit, CallbackSinkNode, DataFrame, DataObjectService, GraphBuilder, LengthUnit, MemoryDataService, Model, ModelBuilder, MultilaterationNode, Orientation } from '@openhps/core';
 import { SocketServer, SocketServerSource } from '@openhps/socket';
 import { BLEObject, PropagationModel, RelativeRSSIProcessing } from '@openhps/rf';
 import { DistanceFunction, Fingerprint, FingerprintService, KNNFingerprintingNode, WeightFunction } from '@openhps/fingerprinting';
 import * as http from 'http';
+import * as csv from 'csv-parser';
+import * as fs from 'fs';
 
 export class App {
     server: http.Server;
@@ -23,6 +25,8 @@ export class App {
         // This function will be executed for every 'worker'
         // because we have an in-memory database
         await this.initBeacons();
+        // Initialize fingerprints (from a pre-recorded dataset/session)
+        await this.loadFingerprints();
     }
 
     /**
@@ -83,12 +87,6 @@ export class App {
                     maxReferences: 9,               // Maximum amount of beacons to use in the calculation
                     maxIterations: 1000,            // Maximum iterations for the nonlinear-least squares algorithm
                 }))
-                .via(new KNNFingerprintingNode({
-                    classifier: 'wlan',             // Classifier links this knn fingerprint node to the correct data service
-                    k: 3,                           // K=3 (fixed)
-                    similarityFunction: DistanceFunction.EUCLIDEAN,
-                    weightFunction: WeightFunction.SQUARE
-                }))
                 // A callback node is an easy node for prototyping and debugging, it allows you to define
                 // a function.
                 .to(new CallbackSinkNode(frame => {
@@ -135,43 +133,76 @@ export class App {
 
     protected initBeacons(): Promise<void> {
         return new Promise((resolve, reject) => {
-            // We will create one data frame to calibrate all data objects
-            // that we know as a developer
-            const dataFrame = new DataFrame();
-
-            // The UID of the beacons are the mac addresses. The position is in 3D
-            // Alternative you could load the beacons from a JSON file
-
-            // Beacons have a set of settings that can either be configured per beacon or globally
-            const beacon1 = new BLEObject("5DC48FBFB912")
-                .setPosition(new Absolute3DPosition(0, 5, 3, LengthUnit.METER));
-            beacon1.environmentFactor = 2.0; // This is the "n" or gamma in the propagation formula (https://en.wikipedia.org/wiki/Log-distance_path_loss_model)
-            beacon1.calibratedRSSI = -69; // Calibrated RSSI at 1 meter distance
-            dataFrame.addObject(beacon1);
-            dataFrame.addObject(new BLEObject("3E182D702D4C")
-                .setPosition(new Absolute3DPosition(10, 3, 3, LengthUnit.METER)));
-            dataFrame.addObject(new BLEObject("027615A1D1B6")
-                .setPosition(new Absolute3DPosition(15, 2, 3, LengthUnit.METER)));
-            dataFrame.addObject(new BLEObject("75A50BDC6C42")
-                .setPosition(new Absolute3DPosition(9, 1, 3, LengthUnit.METER)));
-
-            // Detect whenever the data is stored
-            this.model.onceCompleted(dataFrame.uid).then(() => {
-                // Confirm that our data is stored
-                return this.model.findDataService(BLEObject).count();
-            }).then(count => {
-                console.log(`There are ${count} beacons stored in the data service!`);
-                resolve();
-            }).catch(reject);
-
-            // Push the data frame to the calibration part of the model
-            this.model.findNodeByName("server-calibration").push(dataFrame);
+            // Service to store ble beacons
+            const service: DataObjectService<BLEObject> = this.model.findDataService(BLEObject);
+            const beacons: BLEObject[] = [];
+            fs.createReadStream("data/ble_devices.csv")
+                .pipe(csv())
+                .on('data', (row: any) => {
+                    // console.log(row);
+                    const beacon = new BLEObject(row.ID)
+                        .setPosition(new Absolute3DPosition(parseFloat(row.X), parseFloat(row.Y), parseFloat(row.Z), LengthUnit.METER));
+                    beacon.environmentFactor = 2.0; // This is the "n" or gamma in the propagation formula (https://en.wikipedia.org/wiki/Log-distance_path_loss_model)
+                    beacon.calibratedRSSI = -69; // Calibrated RSSI at 1 meter distance
+                    beacons.push(beacon);
+                })
+                .on('close', function (err: any) {
+                    if (err) {
+                        return reject(err);
+                    }
+                    // Save all beacons
+                    Promise.all(beacons.map(service.insertObject))
+                        .then(() => resolve()).catch(reject);
+                });
         });
     }
 
     protected loadFingerprints(): Promise<void> {
         return new Promise((resolve, reject) => {
+            // Service to store fingerprints
+            const service: FingerprintService = this.model.findDataService(Fingerprint);
+            const fingerprints: Fingerprint[] = [];
+            fs.createReadStream("data/wlan_fingerprints.csv")
+                .pipe(csv())
+                .on('data', (row: any) => {
+                    // console.log(row);
+                    const fingerprint = new Fingerprint();
+                    fingerprint.classifier = "wlan";
+                    fingerprint.createdTimestamp = parseInt(row.TIMESTAMP);
+                    fingerprint.setPosition(new Absolute2DPosition(
+                        parseFloat(row.X),
+                        parseFloat(row.Y)
+                    ));
+                    fingerprint.getPosition().orientation = Orientation.fromEuler({
+                        yaw: parseFloat(row.ORIENTATION),
+                        roll: 0,
+                        pitch: 0,
+                        unit: AngleUnit.DEGREE
+                    });
+                    fingerprints.push(fingerprint);
 
+                    // Add features
+                    Object.keys(row).forEach(key => {
+                        // Column for RSSI value
+                        if (key.startsWith("WAP_")) {
+                            fingerprint.addFeature(key, parseInt(row[key]));
+                        }
+                    });
+                })
+                .on('close', function (err: any) {
+                    if (err) {
+                        return reject(err);
+                    }
+                    // Save all beacons
+                    Promise.all(fingerprints.map(service.insertObject))
+                        .then(() => {
+                            // Update fingerprints (grouping, aggregating)
+                            return service.update();
+                        }).then(() => {
+                            service.count().then(count => console.log(`Loaded ${count} fingerprints!`));
+                            resolve();
+                        }).catch(reject);
+                });
         });
     }
 }

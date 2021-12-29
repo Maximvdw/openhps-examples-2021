@@ -12,8 +12,10 @@
     "@openhps/core": "^0.3.9",
     "@openhps/csv": "^0.1.4",
     "@openhps/fingerprinting": "^0.1.0",
+    "@openhps/imu": "^0.1.1",
     "@openhps/rf": "^0.1.4",
-    "@openhps/socket": "^0.1.1"
+    "@openhps/socket": "^0.1.1",
+    "csv-parser": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^16.11.12",
