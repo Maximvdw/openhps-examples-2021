@@ -3,7 +3,7 @@
  */
 
 import { Absolute3DPosition, CallbackNode, CallbackSinkNode, DataFrame, DataObjectService, GraphBuilder, LengthUnit, MemoryDataService, Model, ModelBuilder, MultilaterationNode } from '@openhps/core';
-import { SocketServer, SocketServerSource } from '@openhps/socket';
+import { SocketServer, SocketServerSink, SocketServerSource } from '@openhps/socket';
 import { BLEObject, PropagationModel, RelativeRSSIProcessing } from '@openhps/rf';
 import * as http from 'http';
 
@@ -85,6 +85,8 @@ export class App {
                 .to(new CallbackSinkNode(frame => {
                     // Log the position in the console
                     console.log("Calculated position: ", frame.source.getPosition().toVector3());
+                }), new SocketServerSink({
+                    uid: "output",                  // Endpoint uid is called "output"
                 }))
             )
             // We create an additional shape for our 'calibration' endpoint
