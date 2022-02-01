@@ -1,6 +1,7 @@
-import { DataFrame, DataObject, Model, ModelBuilder } from '@openhps/core';
-import { SocketClient, SocketClientSink } from '@openhps/socket';
+import { CallbackSinkNode, DataFrame, DataObject, GraphBuilder, Model, ModelBuilder } from '@openhps/core';
+import { SocketClient, SocketClientSink, SocketClientSource } from '@openhps/socket';
 import { RelativeRSSI, BLEObject } from '@openhps/rf';
+import { GraphShape } from '@openhps/core/dist/types/graph/_internal/implementations';
 
 console.log("Creating the positioning model ...");
 
@@ -12,12 +13,20 @@ ModelBuilder.create()
         url: "http://localhost:3000",
         path: "/api/v1"
     }))
-    // Empty source, we manually push data
-    .from()
-    // Socket sink, data is transmitted to a server on port 3000
-    .to(new SocketClientSink({
-        uid: "online"
-    }))
+    .addShape(GraphBuilder.create()
+        // Empty source, we manually push data
+        .from()
+        // Socket sink, data is transmitted to a server on port 3000
+        .to(new SocketClientSink({
+            uid: "online"
+        })))
+    .addShape(GraphBuilder.create()
+        .from(new SocketClientSource({
+            uid: "output"       // Matches uid of the server sink
+        }))
+        .to(new CallbackSinkNode(frame => {
+            console.log("Response from server", frame.source.position.toVector3());
+        })))
     .build().then((model: Model) => {
         console.log("Client positioning model created ...");
 
