@@ -1,7 +1,6 @@
 import { CallbackSinkNode, DataFrame, DataObject, GraphBuilder, Model, ModelBuilder } from '@openhps/core';
 import { SocketClient, SocketClientSink, SocketClientSource } from '@openhps/socket';
 import { RelativeRSSI, BLEObject } from '@openhps/rf';
-import { GraphShape } from '@openhps/core/dist/types/graph/_internal/implementations';
 
 console.log("Creating the positioning model ...");
 
