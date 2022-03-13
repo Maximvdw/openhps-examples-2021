@@ -1,4 +1,4 @@
-import { Absolute2DPosition, AngleUnit, CallbackSinkNode, DataFrame, DataObject, GraphBuilder, Model, ModelBuilder, Orientation, TimedPullNode, TimeService, TimeSyncNode, TimeUnit } from '@openhps/core';
+import { Absolute2DPosition, AngleUnit, CallbackNode, CallbackSinkNode, DataFrame, DataObject, GraphBuilder, Model, ModelBuilder, Orientation, TimedPullNode, TimeService, TimeSyncNode, TimeUnit } from '@openhps/core';
 import { SocketClient, SocketClientSink, SocketClientSource } from '@openhps/socket';
 import { RelativeRSSI, BLEObject, WLANObject } from '@openhps/rf';
 import { CSVDataSource } from '@openhps/csv';
@@ -54,9 +54,7 @@ ModelBuilder.create()
         .via(new TimeSyncNode({
             checkInterval: 100,
         }))
-        .to(new SocketClientSink({
-            uid: "online"
-        })))
+        .to("send-online"))
     // WLAN sensor (simulated from "test" dataset IPIN2021)
     .addShape(GraphBuilder.create()
         .from(new CSVDataSource(path.join(__dirname, "../wlan_fingerprints.csv"), (row) => {
@@ -91,6 +89,9 @@ ModelBuilder.create()
         .via(new TimeSyncNode({
             checkInterval: 100,
         }))
+        .to("send-online"))
+    .addShape(GraphBuilder.create()
+        .from("send-online")
         .to(new SocketClientSink({
             uid: "online"
         })))

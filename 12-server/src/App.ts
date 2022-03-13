@@ -2,7 +2,7 @@
  * This file contains the server logic.
  */
 
-import { Absolute2DPosition, AccuracyModifierNode, AngleUnit, CallbackNode, CellIdentificationNode, DataFrame, DataObject, DataObjectService, FrameMergeNode, GraphBuilder, MemoryDataService, Model, ModelBuilder, MultilaterationNode, Orientation, PushOptions, RelativePosition } from '@openhps/core';
+import { Absolute2DPosition, AccuracyModifierNode, AngleUnit, CellIdentificationNode, DataFrame, DataObject, DataObjectService, FrameMergeNode, GraphBuilder, MemoryDataService, Model, ModelBuilder, MultilaterationNode, Orientation, PushOptions } from '@openhps/core';
 import { SocketServer, SocketServerSink, SocketServerSource } from '@openhps/socket';
 import { BLEObject, PropagationModel, RelativeRSSI, RelativeRSSIProcessing, WLANObject } from '@openhps/rf';
 import * as http from 'http';
@@ -10,6 +10,7 @@ import { DistanceFunction, Fingerprint, FingerprintingNode, FingerprintService, 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as csv from 'csv-parser';
+import { MongoDataServiceDriver } from '@openhps/mongodb';
 
 export class App {
     server: http.Server;
@@ -44,25 +45,37 @@ export class App {
                     srv: this.server,               // Server to use for socket server
                     path: "/api/v1",                // Base URI for the socket server
                 }))
-                .addService(new FingerprintService(new MemoryDataService(
-                    Fingerprint), {
+                .addService(new FingerprintService(new MongoDataServiceDriver(
+                    Fingerprint, {
+                        dbURL: "mongodb://localhost:27017",
+                        dbName: "ipin2021"
+                    }), {
                     classifier: "wlan",             // Fingerprint service for WLAN
                     defaultValue: -95,              // Default value for NaN RSSI values
                     autoUpdate: false,              // Auto update would update the fingerprints on 'every' new offline fingerprint
                     // Group fingerprints by their position + orientation (meaning orientation is taken into account)
                     groupBy: (pos) => ({ pos: pos.toVector3(), orientation: pos.orientation })
                 }))
-                .addService(new FingerprintService(new MemoryDataService(
-                    Fingerprint), {
+                .addService(new FingerprintService(new MongoDataServiceDriver(
+                    Fingerprint, {
+                        dbURL: "mongodb://localhost:27017",
+                        dbName: "ipin2021"
+                    }), {
                     classifier: "ble",              // Fingerprint service for BLE beacons
                     defaultValue: -100,             // Default value for NaN RSSI values
                     autoUpdate: false,              // Auto update would update the fingerprints on 'every' new offline fingerprint
                     groupBy: (pos) => ({ pos: pos.toVector3(), orientation: pos.orientation })
                 }))
-                .addService(new DataObjectService(new MemoryDataService(
-                    WLANObject)))
-                .addService(new DataObjectService(new MemoryDataService(
-                    BLEObject)))
+                .addService(new DataObjectService(new MongoDataServiceDriver(
+                    WLANObject, {
+                        dbURL: "mongodb://localhost:27017",
+                        dbName: "ipin2021"
+                    })))
+                .addService(new DataObjectService(new MongoDataServiceDriver(
+                    BLEObject, {
+                        dbURL: "mongodb://localhost:27017",
+                        dbName: "ipin2021"
+                    })))
                 // Offline stage (compatible with the IPIN 2021 application)
                 .addShape(GraphBuilder.create()
                     .from(new SocketServerSource({
@@ -87,11 +100,6 @@ export class App {
                         uid: "online",
                         persistence: true   // Use previous stored data
                     }))
-                    // // This node logs what kind of data we received
-                    // .via(new CallbackNode(frame => {
-                    //     const relPos: RelativePosition[] = frame.source.relativePositions;
-                    //     console.log(relPos.map(pos => pos.referenceObjectType));
-                    // }))
                     // Process fingerprints
                     .via(
                         GraphBuilder.create()
