@@ -105,5 +105,7 @@ ModelBuilder.create()
             console.log("----------------------------");
         })))
     .build().then((model: Model) => {
+        // Error
+        model.findNodeByUID("online").on('error', console.error);
         console.log("Client positioning model created ...");
     }).catch(console.error);
