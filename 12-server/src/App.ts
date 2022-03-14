@@ -82,6 +82,7 @@ export class App {
                         uid: "offline",     // /api/v1/offline
                         persistence: false  // Persistence false ensures that no 'stored' data on the server overrides the data send by the client
                     }), "internal") // Internal is a placeholder for storing the dataset
+                    .flatten()
                     // Store fingerprints
                     .via(
                         new FingerprintingNode({
@@ -212,7 +213,7 @@ export class App {
             ]).then(results => {
                 const promises: Promise<any>[] = [];
                 results.forEach(result => {
-                    result.map(frame => promises.push(this.model.findNodeByName("internal").push(frame)));
+                    result.map(frame => promises.push(this.model.findNodeByName("internal").push([frame])));
                 });
                 return Promise.all(promises);
             }).then(async () => {

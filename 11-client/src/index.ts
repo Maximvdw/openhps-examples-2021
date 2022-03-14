@@ -92,6 +92,7 @@ ModelBuilder.create()
         .to("send-online"))
     .addShape(GraphBuilder.create()
         .from("send-online")
+        .chunk(5, 300, TimeUnit.MILLISECOND)
         .to(new SocketClientSink({
             uid: "online"
         })))

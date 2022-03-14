@@ -10,6 +10,7 @@ import { DistanceFunction, Fingerprint, FingerprintingNode, FingerprintService, 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as csv from 'csv-parser';
+import * as express from 'express';
 
 export class App {
     server: http.Server;
@@ -29,7 +30,8 @@ export class App {
      * Initialize the server
      */
     protected initServer(): void {
-        this.server = http.createServer().listen(3000);
+        const app = express(); // Debugging (website to see if our IP is ok)
+        this.server = http.createServer(app).listen(3000);
     }
 
     /**
@@ -69,6 +71,8 @@ export class App {
                         uid: "offline",     // /api/v1/offline
                         persistence: false  // Persistence false ensures that no 'stored' data on the server overrides the data send by the client
                     }), "internal") // Internal is a placeholder for storing the dataset
+                    // Flatten chunks
+                    .flatten()
                     // Store fingerprints
                     .via(
                         new FingerprintingNode({
@@ -204,7 +208,7 @@ export class App {
             ]).then(results => {
                 const promises: Promise<any>[] = [];
                 results.forEach(result => {
-                    result.map(frame => promises.push(this.model.findNodeByName("internal").push(frame)));
+                    result.map(frame => promises.push(this.model.findNodeByName("internal").push([frame])));
                 });
                 return Promise.all(promises);
             }).then(async () => {
